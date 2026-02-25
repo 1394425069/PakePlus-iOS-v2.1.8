@@ -1,88 +1,1556 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="./static/css/styles.css" />
-        <meta
-            http-equiv="Content-Security-Policy"
-            content="default-src * 'unsafe-inline' 'unsafe-eval'"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Tauri App</title>
-        <script src="./static/js/main.js"></script>
-    </head>
-    <body>
-        <main class="container">
-            <h1>Welcome to TauriMan</h1>
+<html lang="zh-CN">
 
-            <div class="row">
-                <a
-                    href="https://tauri.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="./assets/tauri.svg"
-                        class="logo tauri"
-                        alt="Tauri logo"
-                    />
-                </a>
-                <a
-                    href="https://pakeplus.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="https://hk.gh-proxy.org/https://github.com/Sjj1024/PakePlus/blob/main/app-icon.png"
-                        class="logo vanilla"
-                        alt="JavaScript logo"
-                    />
-                </a>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>后续计算器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <!-- 配置Tailwind自定义主题 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#165DFF',
+            secondary: '#36D399',
+            warning: '#FFAA33',
+            danger: '#FF5252',
+            neutral: '#F5F7FA',
+            dark: '#1D2939'
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .card-shadow {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      }
+      .transition-smooth {
+        transition: all 0.3s ease;
+      }
+      .table-hover-effect tr:hover {
+        background-color: rgba(22, 93, 255, 0.05);
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    }
+  </style>
+</head>
+
+<body class="font-inter bg-gray-50 min-h-screen flex flex-col">
+  <!-- 顶部导航 -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-calculator text-primary text-2xl"></i>
+        <h1 class="text-xl md:text-2xl font-bold text-dark">后续计算器</h1>
+        <button id="add-tab" class="ml-2 px-2 py-1 rounded-md border border-gray-300 hover:border-primary hover:text-primary transition-smooth">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
+      <div class="hidden md:flex items-center space-x-4">
+        <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 transition-smooth">
+          <i class="fa-regular fa-moon text-gray-600"></i>
+        </button>
+        <button id="help-button" class="p-2 rounded-full hover:bg-gray-100 transition-smooth">
+          <i class="fa-regular fa-question-circle text-gray-600"></i>
+        </button>
+      </div>
+    </div>
+    <div class="container mx-auto px-4 pb-2">
+      <div id="tabs-list" class="flex items-center gap-2 overflow-x-auto"></div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="flex-grow container mx-auto px-4 py-8">
+    <!-- 文件上传区域 -->
+    <section class="mb-8">
+      <div class="bg-white rounded-xl p-6 card-shadow border border-gray-100">
+        <h2 class="text-lg md:text-xl font-semibold mb-4 flex items-center">
+          <i class="fa-solid fa-upload text-primary mr-2"></i>文件上传
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- 头条文件上传区域 -->
+          <div id="cost-file-area"
+            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-smooth cursor-pointer">
+            <input type="file" id="cost-file" accept=".csv,.xlsx,.xls" class="hidden">
+            <i class="fa-solid fa-file-excel text-4xl text-primary mb-2"></i>
+            <p class="mb-1 font-medium">消耗数据文件</p>
+            <p class="text-sm text-gray-500">支持 .csv 和 .xlsx 格式</p>
+            <div id="cost-file-name" class="mt-2 text-sm text-gray-600 hidden"></div>
+          </div>
+
+          <!-- 变现文件上传区域 -->
+          <div id="revenue-file-area"
+            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary transition-smooth cursor-pointer">
+            <input type="file" id="revenue-file" accept=".csv,.xlsx,.xls" class="hidden">
+            <i class="fa-solid fa-file-invoice-dollar text-4xl text-primary mb-2"></i>
+            <p class="mb-1 font-medium">变现收入数据文件</p>
+            <p class="text-sm text-gray-500">支持 .csv 和 .xlsx 格式</p>
+            <div id="revenue-file-name" class="mt-2 text-sm text-gray-600 hidden"></div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-center">
+          <button id="calculate-button"
+            class="bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-smooth disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+            <i class="fa-solid fa-calculator mr-2"></i>
+            <span>计算ROI</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 综合数据概览 -->
+    <section id="overview-section" class="mb-8 opacity-0 transition-smooth">
+      <div class="bg-white rounded-xl p-6 card-shadow border border-gray-100">
+        <h2 class="text-lg md:text-xl font-semibold mb-4 flex items-center">
+          <i class="fa-solid fa-chart-pie text-primary mr-2"></i>综合数据概览
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div class="bg-neutral rounded-lg p-4 flex items-center">
+            <div class="bg-primary/10 p-3 rounded-full mr-4">
+              <i class="fa-solid fa-money-bill text-primary"></i>
             </div>
-            <p>Click to get data</p>
-            <form class="row" id="greet-form">
-                <input id="greet-input" placeholder="Enter a name..." />
-                <button type="submit" id="getdata">GET DATA</button>
-            </form>
-            <div class="functions">
-                <a href="./book.html" target="_self">跳转到book.html</a>
-                <a
-                    href="https://www.baidu.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >跳到百度blank
-                </a>
-                <a
-                    href="https://www.baidu.com"
-                    target="_self"
-                    rel="noopener noreferrer"
-                >
-                    跳到百度self
-                </a>
-                <button onclick="sayHello()">点击我</button>
-                <button onclick="sayHello()">下载文件</button>
-                <button onclick="sayHello()">上传文件</button>
-                <button onclick="sayHello()">访问相机</button>
-                <button onclick="sayHello()">访问麦克风</button>
-                <button onclick="sayHello()">访问相册</button>
-                <button class="btn" onclick="openWechat()">打开微信</button>
-                <button class="btn" onclick="openWechatScan()">
-                    打开扫一扫
-                </button>
-                <button class="btn" onclick="openZhihu()">打开知乎</button>
-                <button onclick="sayHello()">打开抖音</button>
-                <button onclick="sayHello()">用浏览器打开</button>
-                <button>打开知乎</button>
+            <div>
+              <p class="text-sm text-gray-500">总消耗</p>
+              <p id="total-cost" class="text-xl font-bold text-dark">--</p>
             </div>
-            <p id="greet-msg"></p>
-            <img src="./static/image/cursor.jpeg" alt="logo" />
-            <video
-                src="https://hk.gh-proxy.org/https://github.com/Sjj1024/PakePlus/blob/main/docs/static/videos/pakeplus.mp4"
-                autoplay
-                controls
-                style="width: 100%; height: 100%"
-            ></video>
-            <audio src="./static/music/yin.mp3" controls></audio>
-        </main>
-    </body>
+          </div>
+
+          <div class="bg-neutral rounded-lg p-4 flex items-center">
+            <div class="bg-secondary/10 p-3 rounded-full mr-4">
+              <i class="fa-solid fa-coins text-secondary"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">总变现收入</p>
+              <p id="total-revenue" class="text-xl font-bold text-dark">--</p>
+            </div>
+          </div>
+
+          <div class="bg-warning/10 rounded-lg p-4 flex items-center">
+            <div class="bg-warning/10 p-3 rounded-full mr-4">
+              <i class="fa-solid fa-line-chart text-warning"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">综合ROI</p>
+              <p id="total-roi" class="text-xl font-bold text-dark">--</p>
+            </div>
+          </div>
+
+          <div class="bg-warning/10 rounded-lg p-4 flex items-center">
+            <div class="bg-warning/10 p-3 rounded-full mr-4">
+              <i class="fa-solid fa-line-chart text-warning"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">3日ROI</p>
+              <p id="total-3d-roi" class="text-xl font-bold text-dark">--</p>
+            </div>
+          </div>
+
+          <div class="bg-warning/10 rounded-lg p-4 flex items-center">
+            <div class="bg-warning/10 p-3 rounded-full mr-4">
+              <i class="fa-solid fa-line-chart text-warning"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">7日ROI</p>
+              <p id="total-7d-roi" class="text-xl font-bold text-dark">--</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 账户维度数据 -->
+    <section id="account-section" class="mb-8 opacity-0 transition-smooth">
+      <div class="bg-white rounded-xl p-6 card-shadow border border-gray-100">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
+          <h2 class="text-lg md:text-xl font-semibold flex items-center">
+            <i class="fa-solid fa-building text-primary mr-2"></i>账户维度数据
+          </h2>
+          <p id="account-count" class="text-gray-500">账户数量: --</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full table-hover-effect">
+            <thead>
+              <tr class="bg-gray-50">
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">账户</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">单元数量</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  消耗
+                  <button class="sort-button" data-table="account" data-sort="totalCost">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">变现收入</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ROI
+                  <button class="sort-button" data-table="account" data-sort="roi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  3日ROI
+                  <button class="sort-button" data-table="account" data-sort="3dRoi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  7日ROI
+                  <button class="sort-button" data-table="account" data-sort="7dRoi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="account-data-body" class="bg-white divide-y divide-gray-200">
+              <!-- 账户数据将通过JS动态填充 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 单元ID维度数据 -->
+    <section id="ad-section" class="mb-8 opacity-0 transition-smooth">
+      <div class="bg-white rounded-xl p-6 card-shadow border border-gray-100">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
+          <h2 class="text-lg md:text-xl font-semibold flex items-center">
+            <i class="fa-solid fa-ad text-primary mr-2"></i>单元ID维度数据
+          </h2>
+          <div class="flex items-center">
+            <p id="ad-count" class="text-gray-500 mr-4">单元数量: --</p>
+            <div class="relative mr-2">
+              <input type="text" id="ad-search" placeholder="搜索单元ID"
+                class="pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+              <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <select id="account-filter"
+              class="pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary appearance-none bg-white">
+              <option value="">所有账户</option>
+              <!-- 账户选项将通过JS动态填充 -->
+            </select>
+          </div>
+        </div>
+
+        <!-- 素材ID统计概览 -->
+        <div id="material-stats-container" class="mb-6 p-4 bg-neutral rounded-lg hidden">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-md font-semibold flex items-center">
+              <i class="fa-solid fa-chart-bar text-primary mr-2"></i>素材ID使用统计 (仅统计投放中单元)
+            </h3>
+            <div class="flex items-center">
+              <span id="material-stats-count" class="text-sm text-gray-500 mr-3"></span>
+              <button id="clear-material-filter" class="text-sm text-primary hover:text-primary/80 transition-smooth hidden">
+                <i class="fa-solid fa-times mr-1"></i>清除筛选
+              </button>
+            </div>
+          </div>
+          <div id="material-stats" class="flex flex-wrap gap-2">
+            <!-- 素材ID统计将通过JS动态填充 -->
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full table-hover-effect">
+            <thead>
+              <tr class="bg-gray-50">
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  单元ID
+                  <button class="sort-button" data-table="ad" data-sort="adId">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  消耗
+                  <button class="sort-button" data-table="ad" data-sort="cost">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  变现收入
+                  <button class="sort-button" data-table="ad" data-sort="revenue">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ROI
+                  <button class="sort-button" data-table="ad" data-sort="roi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  3日ROI
+                  <button class="sort-button" data-table="ad" data-sort="3dRoi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  7日ROI
+                  <button class="sort-button" data-table="ad" data-sort="7dRoi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">账户</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">计划名称</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">素材ID</th>
+              </tr>
+            </thead>
+            <tbody id="ad-data-body" class="bg-white divide-y divide-gray-200">
+              <!-- 单元数据将通过JS动态填充 -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="no-results" class="py-10 text-center hidden">
+          <i class="fa-solid fa-search text-gray-300 text-4xl mb-3"></i>
+          <p class="text-gray-500">没有找到匹配的结果</p>
+        </div>
+
+        <div id="loading" class="py-10 text-center hidden">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p class="mt-2 text-gray-500">加载中...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 素材ID维度数据 -->
+    <section id="material-section" class="mb-8 opacity-0 transition-smooth">
+      <div class="bg-white rounded-xl p-6 card-shadow border border-gray-100">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
+          <h2 class="text-lg md:text-xl font-semibold flex items-center">
+            <i class="fa-solid fa-layer-group text-primary mr-2"></i>素材ID维度数据
+          </h2>
+          <p id="material-count" class="text-gray-500">素材ID数量: --</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full table-hover-effect">
+            <thead>
+              <tr class="bg-gray-50">
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  素材ID
+                  <button class="sort-button" data-table="material" data-sort="materialId">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  使用次数
+                  <button class="sort-button" data-table="material" data-sort="count">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  总消耗
+                  <button class="sort-button" data-table="material" data-sort="totalCost">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  总变现收入
+                  <button class="sort-button" data-table="material" data-sort="totalRevenue">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  总3日收入
+                  <button class="sort-button" data-table="material" data-sort="totalRevenue3d">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  总7日收入
+                  <button class="sort-button" data-table="material" data-sort="totalRevenue7d">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ROI
+                  <button class="sort-button" data-table="material" data-sort="roi">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  3日ROI
+                  <button class="sort-button" data-table="material" data-sort="roi3d">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  7日ROI
+                  <button class="sort-button" data-table="material" data-sort="roi7d">
+                    <i class="fa-solid fa-caret-up"></i>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="material-data-body" class="bg-white divide-y divide-gray-200">
+              <!-- 素材ID数据将通过JS动态填充 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 页脚 -->
+  <footer class="bg-white border-t border-gray-200 py-6">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="text-gray-500 text-sm mb-4 md:mb-0">
+          © 后续计算器
+        </div>
+        <div class="flex space-x-4">
+          <a href="#" class="text-gray-400 hover:text-primary transition-smooth">
+            <i class="fa-brands fa-github"></i>
+          </a>
+          <a href="#" class="text-gray-400 hover:text-primary transition-smooth">
+            <i class="fa-brands fa-twitter"></i>
+          </a>
+          <a href="#" class="text-gray-400 hover:text-primary transition-smooth">
+            <i class="fa-brands fa-linkedin"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 帮助模态框 -->
+  <div id="help-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-dark">使用帮助</h3>
+        <button id="close-help" class="text-gray-400 hover:text-gray-600">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+      <div class="space-y-4 text-gray-700">
+        <div>
+          <h4 class="font-semibold text-primary mb-1">如何使用?</h4>
+          <ol class="list-decimal list-inside space-y-2">
+            <li>准备两个文件：消耗数据文件和变现收入数据文件</li>
+            <li>点击对应的上传区域，选择相应的文件</li>
+            <li>点击"计算ROI"按钮开始处理数据</li>
+            <li>查看综合数据概览、账户维度数据和单元ID维度数据</li>
+          </ol>
+        </div>
+        <div>
+          <h4 class="font-semibold text-primary mb-1">文件格式要求</h4>
+          <ul class="list-disc list-inside space-y-2">
+            <li>支持 .csv, .xlsx, .xls 格式</li>
+            <li>两个文件都必须包含"单元ID"列</li>
+            <li>消耗数据文件必须包含"消耗"列</li>
+            <li>消耗数据文件建议包含"单元一级状态"列</li>
+            <li>变现收入数据文件必须包含"当日变现收入"列、"3 日变现收入 (元)"列和"7 日变现收入 (元)"列</li>
+            <li>消耗数据文件建议包含"账户"列和"计划名称"列</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-primary mb-1">新增功能</h4>
+          <ul class="list-disc list-inside space-y-2">
+            <li>新增素材ID统计功能，自动从"计划名称"中提取最后一个"-"后的数字作为素材ID</li>
+            <li>仅统计状态为"投放中"的单元的素材ID</li>
+            <li>在单元ID维度数据表格中新增"素材ID"列</li>
+            <li>显示素材ID使用次数统计概览</li>
+            <li>点击素材ID可以直接筛选出使用该素材ID的单元计划</li>
+            <li>根据单元一级状态在单元ID后显示状态指示圆点：绿色(投放中)、红色(未投放)、黄色(其他状态)</li>
+            <li><strong>新增素材ID维度数据统计表，展示每个素材ID的消耗、变现收入和ROI指标</strong></li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-6 text-center">
+        <button id="got-it"
+          class="bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-smooth">
+          明白了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 单元ROI计算器 - 改进版JavaScript代码
+
+    // 全局变量
+    let costData = null;
+    let revenueData = null;
+    let processedData = null;
+    
+    // 排序状态 - 分别管理账户、素材和单元的排序
+    let accountSortState = {
+      sortBy: null,
+      sortOrder: 'asc'
+    };
+    
+    let materialSortState = {
+      sortBy: null,
+      sortOrder: 'asc'
+    };
+    
+    let adSortState = {
+      sortBy: null,
+      sortOrder: 'asc'
+    };
+    
+    let defaultAdData = []; // 存储默认排序的单元数据
+    let defaultAccountData = []; // 存储默认排序的账户数据
+    let defaultMaterialData = []; // 存储默认排序的素材数据
+    let currentMaterialFilter = null; // 当前筛选的素材ID
+
+    // 列名映射 - 增强匹配能力，添加了"单元ID"的多种变体
+    const COLUMN_MAPPING = {
+      '单元ID': [
+        '单元id', '单元ID', '单元 id', '单元 ID', '单元编号', '广告单元ID',
+        '广告 id', '广告ID', 'ad_id', 'adid', '广告 ID', '广告id'
+      ],
+      '消耗': ['花费', 'cost', '消耗', '当日累计花费', '花费(元)', '消耗金额', '总消耗', '累计消耗', '当日消耗', '当日花费', '总花费', '累计花费'],
+      '当日变现收入': ['收入', 'revenue', '当日变现收入', '当日变现收入(元)', '当日 变现收入 (元)'],
+      '计划名称': ['计划名称', 'campaign_name', '广告计划名称', '计划名'],
+      '单元一级状态': ['单元一级状态', '单元状态', '状态', 'ad_status', '广告一级状态', '广告状态'],
+      '3 日变现收入 (元)': [
+        '3日变现收入（元）', '3日变现收入(元)', '3日 变现收入（元）', '3日 变现收入 （元）', '3日 变现收入 (元)', '3日变现收入 元'
+      ],
+      '7 日变现收入 (元)': [
+        '7日变现收入（元）', '7日变现收入(元)', '7日 变现收入（元）', '7日 变现收入 （元）', '7日 变现收入 (元)', '7日变现收入 元'
+      ]
+    };
+
+    // 等待DOM完全加载
+    document.addEventListener('DOMContentLoaded', function () {
+      // 初始化应用
+      initApp();
+    });
+
+    // 初始化应用
+    function initApp() {
+      console.log('单元ROI计算器初始化完成');
+
+      // DOM 元素 - 使用更健壮的选择器
+      const costFileInput = document.getElementById('cost-file');
+      const revenueFileInput = document.getElementById('revenue-file');
+      const costFileArea = document.getElementById('cost-file-area');
+      const revenueFileArea = document.getElementById('revenue-file-area');
+      const costFileName = document.getElementById('cost-file-name');
+      const revenueFileName = document.getElementById('revenue-file-name');
+      const calculateButton = document.getElementById('calculate-button');
+      const overviewSection = document.getElementById('overview-section');
+      const accountSection = document.getElementById('account-section');
+      const materialSection = document.getElementById('material-section');
+      const adSection = document.getElementById('ad-section');
+      const adSearch = document.getElementById('ad-search');
+      const accountFilter = document.getElementById('account-filter');
+      const adDataBody = document.getElementById('ad-data-body');
+      const accountDataBody = document.getElementById('account-data-body');
+      const materialDataBody = document.getElementById('material-data-body');
+      const noResults = document.getElementById('no-results');
+      const loading = document.getElementById('loading');
+      const helpButton = document.getElementById('help-button');
+      const helpModal = document.getElementById('help-modal');
+      const closeHelp = document.getElementById('close-help');
+      const gotIt = document.getElementById('got-it');
+      const themeToggle = document.getElementById('theme-toggle');
+      const accountCount = document.getElementById('account-count');
+      const materialCount = document.getElementById('material-count');
+      const adCount = document.getElementById('ad-count');
+      const materialStatsContainer = document.getElementById('material-stats-container');
+      const materialStats = document.getElementById('material-stats');
+      const materialStatsCount = document.getElementById('material-stats-count');
+      const clearMaterialFilter = document.getElementById('clear-material-filter');
+      const addTab = document.getElementById('add-tab');
+      const tabsList = document.getElementById('tabs-list');
+
+      // 检查关键元素是否存在
+      const requiredElements = [
+        costFileInput, revenueFileInput, costFileArea, revenueFileArea,
+        calculateButton, helpButton, helpModal
+      ];
+
+      for (const element of requiredElements) {
+        if (!element) {
+          console.error('关键元素缺失:', element);
+          return;
+        }
+      }
+
+      // 文件上传区域点击事件
+      costFileArea.addEventListener('click', () => {
+        console.log('点击了消耗数据文件区域');
+        costFileInput.click();
+      });
+
+      revenueFileArea.addEventListener('click', () => {
+        console.log('点击了变现收入数据文件区域');
+        revenueFileInput.click();
+      });
+
+      // 文件选择事件
+      costFileInput.addEventListener('change', (e) => {
+        console.log('消耗数据文件选择事件触发');
+        if (e.target.files.length > 0) {
+          const file = e.target.files[0];
+          costFileName.textContent = file.name;
+          costFileName.classList.remove('hidden');
+          costFileArea.classList.remove('border-dashed', 'border-gray-300');
+          costFileArea.classList.add('border-primary');
+          costData = file;
+          setSessionFile('cost', file);
+          updateActiveTabLabel();
+          checkAndEnableCalculateButton();
+          console.log('已选择消耗数据文件:', file.name);
+        }
+      });
+
+      revenueFileInput.addEventListener('change', (e) => {
+        console.log('变现收入数据文件选择事件触发');
+        if (e.target.files.length > 0) {
+          const file = e.target.files[0];
+          revenueFileName.textContent = file.name;
+          revenueFileName.classList.remove('hidden');
+          revenueFileArea.classList.remove('border-dashed', 'border-gray-300');
+          revenueFileArea.classList.add('border-primary');
+          revenueData = file;
+          setSessionFile('revenue', file);
+          updateActiveTabLabel();
+          checkAndEnableCalculateButton();
+          console.log('已选择变现收入数据文件:', file.name);
+        }
+      });
+
+      // 检查并启用计算按钮
+      function checkAndEnableCalculateButton() {
+        if (costData && revenueData) {
+          calculateButton.disabled = false;
+        }
+      }
+
+      // 计算按钮点击事件 - 添加错误捕获
+      calculateButton.addEventListener('click', async () => {
+        console.log('计算按钮被点击');
+
+        if (!costData || !revenueData) {
+          console.warn('缺少文件数据');
+          return;
+        }
+
+        // 显示加载状态
+        calculateButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i><span>计算中...</span>';
+        calculateButton.disabled = true;
+        loading.classList.remove('hidden');
+        adDataBody.innerHTML = '';
+        accountDataBody.innerHTML = '';
+        materialDataBody.innerHTML = '';
+        overviewSection.classList.add('opacity-0');
+        accountSection.classList.add('opacity-0');
+        materialSection.classList.add('opacity-0');
+        adSection.classList.add('opacity-0');
+        materialStatsContainer.classList.add('hidden');
+        
+        // 重置筛选状态
+        currentMaterialFilter = null;
+        clearMaterialFilter.classList.add('hidden');
+        
+        // 重置排序状态
+        accountSortState = { sortBy: null, sortOrder: 'asc' };
+        materialSortState = { sortBy: null, sortOrder: 'asc' };
+        adSortState = { sortBy: null, sortOrder: 'asc' };
+
+        try {
+          // 解析文件
+          const [costRecords, revenueRecords] = await Promise.all([
+            parseFile(costData),
+            parseFile(revenueData)
+          ]);
+
+          // 处理数据
+          processedData = processData(costRecords, revenueRecords);
+          setSessionProcessedData(processedData);
+          defaultAdData = [...processedData.adData]; // 存储默认排序的单元数据
+          defaultAccountData = [...processedData.accountData]; // 存储默认排序的账户数据
+          defaultMaterialData = [...processedData.materialData]; // 存储默认排序的素材数据
+
+          // 显示结果
+          displayOverview(processedData);
+          displayAccountData(processedData, accountCount);
+          displayMaterialData(processedData, materialCount);
+          displayAdData(processedData, adCount);
+          populateAccountFilter(processedData.accountData); // 填充账户筛选下拉框
+
+          // 显示结果区域
+          overviewSection.classList.remove('opacity-0');
+          accountSection.classList.remove('opacity-0');
+          materialSection.classList.remove('opacity-0');
+          adSection.classList.remove('opacity-0');
+
+          // 添加动画效果
+          overviewSection.classList.add('animate-fadeIn');
+          accountSection.classList.add('animate-fadeIn');
+          materialSection.classList.add('animate-fadeIn');
+          adSection.classList.add('animate-fadeIn');
+
+          // 平滑滚动到结果区域
+          overviewSection.scrollIntoView({ behavior: 'smooth' });
+        } catch (error) {
+          console.error('处理文件时出错:', error);
+          alert(`处理文件时出错: ${error.message}`);
+        } finally {
+          // 恢复按钮状态
+          calculateButton.innerHTML = '<i class="fa-solid fa-calculator mr-2"></i><span>计算ROI</span>';
+          calculateButton.disabled = false;
+          loading.classList.add('hidden');
+        }
+      });
+      
+      let sessions = [];
+      let activeSessionIndex = 0;
+      let dragIndex = null;
+      function addSession() {
+        const id = Date.now().toString();
+        sessions.push({ id, label: '未命名', costFile: null, revenueFile: null, processedData: null });
+        activeSessionIndex = sessions.length - 1;
+        renderTabs();
+        restoreActiveSessionUI();
+      }
+      function renderTabs() {
+        tabsList.innerHTML = '';
+        sessions.forEach((s, idx) => {
+          const wrap = document.createElement('div');
+          const active = idx === activeSessionIndex;
+          wrap.className = `flex items-center gap-2 px-2 py-1 rounded-md border ${active ? 'border-primary bg-primary/5' : 'border-gray-300'} transition-smooth`;
+          wrap.setAttribute('draggable', 'true');
+          wrap.dataset.index = String(idx);
+          const labelBtn = document.createElement('button');
+          labelBtn.className = `${active ? 'text-primary' : 'text-gray-700 hover:text-primary'} whitespace-nowrap`;
+          labelBtn.textContent = s.label;
+          labelBtn.addEventListener('click', () => {
+            activeSessionIndex = idx;
+            renderTabs();
+            restoreActiveSessionUI();
+          });
+          const delBtn = document.createElement('button');
+          delBtn.className = 'text-gray-400 hover:text-danger transition-smooth';
+          delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteSession(idx);
+          });
+          wrap.addEventListener('dragstart', () => {
+            dragIndex = idx;
+            wrap.classList.add('border-primary');
+          });
+          wrap.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            wrap.classList.add('bg-primary/10');
+          });
+          wrap.addEventListener('dragleave', () => {
+            wrap.classList.remove('bg-primary/10');
+          });
+          wrap.addEventListener('drop', (e) => {
+            e.preventDefault();
+            wrap.classList.remove('bg-primary/10');
+            const targetIndex = parseInt(wrap.dataset.index || '0', 10);
+            if (dragIndex === null || dragIndex === targetIndex) return;
+            moveSession(dragIndex, targetIndex);
+            dragIndex = null;
+          });
+          wrap.addEventListener('dragend', () => {
+            wrap.classList.remove('border-primary', 'bg-primary/10');
+            dragIndex = null;
+          });
+          wrap.appendChild(labelBtn);
+          wrap.appendChild(delBtn);
+          tabsList.appendChild(wrap);
+        });
+      }
+      function setSessionFile(type, file) {
+        const s = sessions[activeSessionIndex];
+        if (type === 'cost') s.costFile = file;
+        if (type === 'revenue') s.revenueFile = file;
+      }
+      function setSessionProcessedData(data) {
+        sessions[activeSessionIndex].processedData = data;
+      }
+      function extractDateTokens(name) {
+        if (!name) return [];
+        const tokens = [];
+        const compact = name.match(/20\d{6}/g) || [];
+        compact.forEach(s => tokens.push(s.slice(4, 8)));
+        const separated = name.match(/20\d{2}[-_]\d{2}[-_]\d{2}/g) || [];
+        separated.forEach(s => tokens.push(s.replace(/[-_]/g, '').slice(4, 8)));
+        const seen = new Set();
+        const unique = [];
+        tokens.forEach(t => { if (!seen.has(t)) { seen.add(t); unique.push(t); } });
+        return unique;
+      }
+      function buildLabelFromRevenueFilename(name) {
+        const tokens = extractDateTokens(name);
+        if (tokens.length === 0) return '未命名';
+        if (tokens.length === 1) return tokens[0];
+        const start = tokens[0];
+        const end = tokens[tokens.length - 1];
+        return start === end ? start : `${start}-${end}`;
+      }
+      function updateActiveTabLabel() {
+        const s = sessions[activeSessionIndex];
+        s.label = s.revenueFile ? buildLabelFromRevenueFilename(s.revenueFile.name) : '未命名';
+        renderTabs();
+      }
+      function restoreActiveSessionUI() {
+        const s = sessions[activeSessionIndex];
+        if (s.costFile) {
+          costFileName.textContent = s.costFile.name;
+          costFileName.classList.remove('hidden');
+          costFileArea.classList.remove('border-dashed', 'border-gray-300');
+          costFileArea.classList.add('border-primary');
+        } else {
+          costFileName.textContent = '';
+          costFileName.classList.add('hidden');
+          costFileArea.classList.add('border-dashed', 'border-gray-300');
+          costFileArea.classList.remove('border-primary');
+        }
+        if (s.revenueFile) {
+          revenueFileName.textContent = s.revenueFile.name;
+          revenueFileName.classList.remove('hidden');
+          revenueFileArea.classList.remove('border-dashed', 'border-gray-300');
+          revenueFileArea.classList.add('border-primary');
+        } else {
+          revenueFileName.textContent = '';
+          revenueFileName.classList.add('hidden');
+          revenueFileArea.classList.add('border-dashed', 'border-gray-300');
+          revenueFileArea.classList.remove('border-primary');
+        }
+        if (s.costFile && s.revenueFile) {
+          calculateButton.disabled = false;
+        } else {
+          calculateButton.disabled = true;
+        }
+        if (s.processedData) {
+          processedData = s.processedData;
+          displayOverview(processedData);
+          displayAccountData(processedData, accountCount);
+          displayMaterialData(processedData, materialCount);
+          displayAdData(processedData, adCount);
+          overviewSection.classList.remove('opacity-0');
+          accountSection.classList.remove('opacity-0');
+          materialSection.classList.remove('opacity-0');
+          adSection.classList.remove('opacity-0');
+        } else {
+          overviewSection.classList.add('opacity-0');
+          accountSection.classList.add('opacity-0');
+          materialSection.classList.add('opacity-0');
+          adSection.classList.add('opacity-0');
+          adDataBody.innerHTML = '';
+          accountDataBody.innerHTML = '';
+          materialDataBody.innerHTML = '';
+          document.getElementById('total-cost').textContent = '--';
+          document.getElementById('total-revenue').textContent = '--';
+          document.getElementById('total-roi').textContent = '--';
+          document.getElementById('total-3d-roi').textContent = '--';
+          document.getElementById('total-7d-roi').textContent = '--';
+        }
+      }
+      addTab.addEventListener('click', () => {
+        addSession();
+      });
+      addSession();
+      function deleteSession(idx) {
+        if (sessions.length === 1) {
+          sessions = [];
+          addSession();
+          return;
+        }
+        sessions.splice(idx, 1);
+        if (activeSessionIndex >= sessions.length) {
+          activeSessionIndex = sessions.length - 1;
+        }
+        renderTabs();
+        restoreActiveSessionUI();
+      }
+      function moveSession(from, to) {
+        if (from === to) return;
+        const [item] = sessions.splice(from, 1);
+        sessions.splice(to, 0, item);
+        if (activeSessionIndex === from) {
+          activeSessionIndex = to;
+        } else if (from < to && activeSessionIndex > from && activeSessionIndex <= to) {
+          activeSessionIndex -= 1;
+        } else if (to < from && activeSessionIndex >= to && activeSessionIndex < from) {
+          activeSessionIndex += 1;
+        }
+        renderTabs();
+        restoreActiveSessionUI();
+      }
+
+      // 解析文件
+      function parseFile(file) {
+        return new Promise((resolve, reject) => {
+          if (file.name.endsWith('.csv')) {
+            Papa.parse(file, {
+              header: true,
+              dynamicTyping: true,
+              skipEmptyLines: true,
+              complete: function (results) {
+                if (results.errors.length > 0) {
+                  reject(new Error('解析CSV文件时出错'));
+                } else {
+                  resolve(results.data);
+                }
+              },
+              error: function () {
+                reject(new Error('读取CSV文件时出错'));
+              }
+            });
+          } else {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const records = XLSX.utils.sheet_to_json(worksheet);
+                resolve(records);
+              } catch (error) {
+                reject(new Error('无法解析文件，格式不正确'));
+              }
+            };
+            reader.onerror = () => reject(new Error('读取文件时出错'));
+            reader.readAsArrayBuffer(file);
+          }
+        });
+      }
+
+      function normalizeHeader(str) {
+        return String(str || '')
+          .toLowerCase()
+          .replace(/\s+/g, '')
+          .replace(/[()（）]/g, '')
+          .replace(/，/g, ',')
+          .replace(/：/g, ':');
+      }
+      function findMappedColumn(headers, targetColumn) {
+        const normalizedHeaders = headers.map(h => normalizeHeader(h));
+        const normalizedTarget = normalizeHeader(targetColumn);
+        const exactIndex = normalizedHeaders.indexOf(normalizedTarget);
+        if (exactIndex !== -1) return headers[exactIndex];
+        const aliases = COLUMN_MAPPING[targetColumn] || [];
+        for (const alias of aliases) {
+          const ni = normalizedHeaders.indexOf(normalizeHeader(alias));
+          if (ni !== -1) return headers[ni];
+        }
+        const containsIndex = normalizedHeaders.findIndex(h => h.includes(normalizedTarget));
+        if (containsIndex !== -1) return headers[containsIndex];
+        return null;
+      }
+
+      // 从计划名称中提取素材ID（最后一个"-"后的数字内容）
+      function extractMaterialId(campaignName) {
+        if (!campaignName || typeof campaignName !== 'string') {
+          return '';
+        }
+        
+        // 找到最后一个"-"的位置
+        const lastDashIndex = campaignName.lastIndexOf('-');
+        if (lastDashIndex === -1) {
+          return '';
+        }
+        
+        // 获取最后一个"-"后面的内容
+        const idPart = campaignName.substring(lastDashIndex + 1).trim();
+        
+        // 检查是否为数字（支持整数和小数）
+        const match = idPart.match(/^\d+(\.\d+)?$/);
+        return match ? match[0] : '';
+      }
+
+      // 处理数据
+      function processData(costRecords, revenueRecords) {
+        if (!costRecords || costRecords.length === 0) {
+          throw new Error('消耗数据文件为空');
+        }
+
+        if (!revenueRecords || revenueRecords.length === 0) {
+          throw new Error('变现收入数据文件为空');
+        }
+
+        // 获取列名
+        const costHeaders = Object.keys(costRecords[0]);
+        const revenueHeaders = Object.keys(revenueRecords[0]);
+
+        // 查找必要的列
+        const mappedColumns = {
+          cost: {
+            '单元ID': findMappedColumn(costHeaders, '单元ID'),
+            '消耗': findMappedColumn(costHeaders, '消耗'),
+            '账户': findMappedColumn(costHeaders, '账户') || '未知账户',
+            '计划名称': findMappedColumn(costHeaders, '计划名称') || '未知计划',
+            '单元一级状态': findMappedColumn(costHeaders, '单元一级状态') || '未知状态'
+          },
+          revenue: {
+            '单元ID': findMappedColumn(revenueHeaders, '单元ID'),
+            '当日变现收入': findMappedColumn(revenueHeaders, '当日变现收入'),
+            '3 日变现收入 (元)': findMappedColumn(revenueHeaders, '3 日变现收入 (元)'),
+            '7 日变现收入 (元)': findMappedColumn(revenueHeaders, '7 日变现收入 (元)')
+          }
+        };
+
+        // 检查必要的列是否存在
+        const headersMap = { cost: costHeaders, revenue: revenueHeaders };
+        for (const [fileType, columns] of Object.entries(mappedColumns)) {
+          for (const [requiredColumn, mappedColumn] of Object.entries(columns)) {
+            if (!mappedColumn && requiredColumn !== '单元一级状态') {
+              throw new Error(`${fileType === 'cost' ? '消耗' : '变现收入'}数据文件缺少必要的列: ${requiredColumn}，当前表头：${headersMap[fileType].join(', ')}`);
+            }
+          }
+        }
+
+        console.log('列映射结果:', mappedColumns);
+
+        // 构建单元ID到消耗数据的映射
+        const costMap = new Map();
+        costRecords.forEach(record => {
+          const adId = record[mappedColumns.cost['单元ID']] ? record[mappedColumns.cost['单元ID']].toString().trim() : '';
+          const cost = parseFloat(record[mappedColumns.cost['消耗']]) || 0;
+          const account = record[mappedColumns.cost['账户']] || '未知账户';
+          const campaignName = record[mappedColumns.cost['计划名称']] || '未知计划';
+          const status = mappedColumns.cost['单元一级状态'] ? record[mappedColumns.cost['单元一级状态']] || '未知状态' : '未知状态';
+
+          costMap.set(adId, { cost, account, campaignName, status });
+        });
+
+        // 构建单元ID到变现收入数据的映射，累加收入
+        const revenueMap = new Map();
+        revenueRecords.forEach(record => {
+          const adId = record[mappedColumns.revenue['单元ID']] ? record[mappedColumns.revenue['单元ID']].toString().trim() : '';
+          let revenue = record[mappedColumns.revenue['当日变现收入']];
+          if (typeof revenue === 'string') {
+            revenue = parseFloat(revenue.replace(/,/g, '')); // 去除逗号
+          }
+          revenue = parseFloat(revenue) || 0;
+
+          let revenue3d = record[mappedColumns.revenue['3 日变现收入 (元)']];
+          if (typeof revenue3d === 'string') {
+            revenue3d = parseFloat(revenue3d.replace(/,/g, '')); // 去除逗号
+          }
+          revenue3d = parseFloat(revenue3d) || 0;
+
+          let revenue7d = record[mappedColumns.revenue['7 日变现收入 (元)']];
+          if (typeof revenue7d === 'string') {
+            revenue7d = parseFloat(revenue7d.replace(/,/g, '')); // 去除逗号
+          }
+          revenue7d = parseFloat(revenue7d) || 0;
+
+          if (adId && revenueMap.has(adId)) {
+            const existingData = revenueMap.get(adId);
+            revenueMap.set(adId, {
+              revenue: existingData.revenue + revenue,
+              revenue3d: existingData.revenue3d + revenue3d,
+              revenue7d: existingData.revenue7d + revenue7d
+            });
+          } else if (adId) {
+            revenueMap.set(adId, { revenue, revenue3d, revenue7d });
+          }
+        });
+
+        // 找出共同的单元ID
+        const commonAdIds = [...new Set([...costMap.keys(), ...revenueMap.keys()])]
+          .filter(adId => costMap.has(adId) && revenueMap.has(adId));
+
+        if (commonAdIds.length === 0) {
+          throw new Error('两个文件中没有找到共同的单元ID，请检查数据');
+        }
+
+        // 构建结果数据
+        const adData = commonAdIds.map(adId => {
+          const { cost, account, campaignName, status } = costMap.get(adId);
+          const { revenue, revenue3d, revenue7d } = revenueMap.get(adId);
+          const roi = cost > 0 ? (revenue / cost) : 0;
+          const roi3d = cost > 0 ? (revenue3d / cost) : 0;
+          const roi7d = cost > 0 ? (revenue7d / cost) : 0;
+          
+          // 提取素材ID
+          const materialId = extractMaterialId(campaignName);
+
+          return {
+            adId,
+            cost,
+            revenue,
+            revenue3d,
+            revenue7d,
+            roi,
+            roi3d,
+            roi7d,
+            account,
+            campaignName,
+            status,
+            materialId
+          };
+        });
+
+        // 计算账户维度数据
+        const accountData = {};
+        adData.forEach(item => {
+          if (!accountData[item.account]) {
+            accountData[item.account] = {
+              account: item.account,
+              totalCost: 0,
+              totalRevenue: 0,
+              totalRevenue3d: 0,
+              totalRevenue7d: 0,
+              count: 0, // 初始化单元数量为0
+              hasActiveAd: false // 初始化是否有投放中单元为false
+            };
+          }
+
+          accountData[item.account].totalCost += item.cost;
+          accountData[item.account].totalRevenue += item.revenue;
+          accountData[item.account].totalRevenue3d += item.revenue3d;
+          accountData[item.account].totalRevenue7d += item.revenue7d;
+          accountData[item.account].count += 1; // 单元数量加1
+          
+          // 检查是否有投放中的单元
+          if (item.status === '投放中') {
+            accountData[item.account].hasActiveAd = true;
+          }
+        });
+
+        // 计算账户维度的ROI并转换为数组
+        const accountArray = Object.values(accountData).map(account => {
+          const roi = account.totalCost > 0 ? (account.totalRevenue / account.totalCost) : 0;
+          const roi3d = account.totalCost > 0 ? (account.totalRevenue3d / account.totalCost) : 0;
+          const roi7d = account.totalCost > 0 ? (account.totalRevenue7d / account.totalCost) : 0;
+          return { ...account, roi, roi3d, roi7d };
+        });
+
+        // 计算素材ID维度数据
+        const materialData = {};
+        adData.forEach(item => {
+          if (item.materialId) {
+            if (!materialData[item.materialId]) {
+              materialData[item.materialId] = {
+                materialId: item.materialId,
+                totalCost: 0,
+                totalRevenue: 0,
+                totalRevenue3d: 0,
+                totalRevenue7d: 0,
+                count: 0 // 初始化使用次数为0
+              };
+            }
+
+            materialData[item.materialId].totalCost += item.cost;
+            materialData[item.materialId].totalRevenue += item.revenue;
+            materialData[item.materialId].totalRevenue3d += item.revenue3d;
+            materialData[item.materialId].totalRevenue7d += item.revenue7d;
+            materialData[item.materialId].count += 1; // 使用次数加1
+          }
+        });
+
+        // 计算素材ID维度的ROI并转换为数组
+        const materialArray = Object.values(materialData).map(material => {
+          const roi = material.totalCost > 0 ? (material.totalRevenue / material.totalCost) : 0;
+          const roi3d = material.totalCost > 0 ? (material.totalRevenue3d / material.totalCost) : 0;
+          const roi7d = material.totalCost > 0 ? (material.totalRevenue7d / material.totalCost) : 0;
+          return { ...material, roi, roi3d, roi7d };
+        });
+
+        // 计算总计
+        const totalCost = adData.reduce((sum, item) => sum + item.cost, 0);
+        const totalRevenue = adData.reduce((sum, item) => sum + item.revenue, 0);
+        const totalRevenue3d = adData.reduce((sum, item) => sum + item.revenue3d, 0);
+        const totalRevenue7d = adData.reduce((sum, item) => sum + item.revenue7d, 0);
+
+        const totalRoi = totalCost > 0 ? (totalRevenue / totalCost) : 0;
+        const totalRoi3d = totalCost > 0 ? (totalRevenue3d / totalCost) : 0;
+        const totalRoi7d = totalCost > 0 ? (totalRevenue7d / totalCost) : 0;
+
+        return {
+          adData,
+          accountData: accountArray,
+          materialData: materialArray,
+          total: {
+            cost: totalCost,
+            revenue: totalRevenue,
+            roi: totalRoi,
+            roi3d: totalRoi3d,
+            roi7d: totalRoi7d
+          }
+        };
+      }
+
+      // 显示概览数据
+      function displayOverview(data) {
+        document.getElementById('total-cost').textContent = formatNumber(data.total.cost);
+        document.getElementById('total-revenue').textContent = formatNumber(data.total.revenue);
+        document.getElementById('total-roi').textContent = formatRoi(data.total.roi);
+        document.getElementById('total-3d-roi').textContent = formatRoi(data.total.roi3d);
+        document.getElementById('total-7d-roi').textContent = formatRoi(data.total.roi7d);
+      }
+
+      // 显示账户维度数据
+      function displayAccountData(data, accountCountElement) {
+        const accountDataBody = document.getElementById('account-data-body');
+        accountDataBody.innerHTML = '';
+
+        // 应用排序
+        let displayData = [...data.accountData];
+        if (accountSortState.sortBy) {
+          displayData.sort((a, b) => {
+            const aValue = a[accountSortState.sortBy];
+            const bValue = b[accountSortState.sortBy];
+            
+            if (accountSortState.sortOrder === 'asc') {
+              return aValue - bValue;
+            } else {
+              return bValue - aValue;
+            }
+          });
+        }
+
+        displayData.forEach(account => {
+          const row = document.createElement('tr');
+          // 根据是否有投放中单元确定小点颜色
+          const dotColor = account.hasActiveAd ? 'bg-green-500' : 'bg-red-500';
+          
+          row.innerHTML = `
+            <td class="px-4 py-3 flex items-center">
+              ${account.account}
+              <span class="ml-2 inline-block h-2 w-2 rounded-full ${dotColor}"></span>
+            </td>
+            <td class="px-4 py-3 text-center">${account.count}</td>
+            <td class="px-4 py-3">${formatNumber(account.totalCost)}</td>
+            <td class="px-4 py-3">${formatNumber(account.totalRevenue)}</td>
+            <td class="px-4 py-3">${formatRoi(account.roi)}</td>
+            <td class="px-4 py-3">${formatRoi(account.roi3d)}</td>
+            <td class="px-4 py-3">${formatRoi(account.roi7d)}</td>
+          `;
+          accountDataBody.appendChild(row);
+        });
+
+        accountCountElement.textContent = `账户数量: ${displayData.length}`;
+      }
+
+      // 显示素材ID维度数据
+      function displayMaterialData(data, materialCountElement) {
+        const materialDataBody = document.getElementById('material-data-body');
+        materialDataBody.innerHTML = '';
+
+        // 应用排序
+        let displayData = [...data.materialData];
+        if (materialSortState.sortBy) {
+          displayData.sort((a, b) => {
+            const aValue = a[materialSortState.sortBy];
+            const bValue = b[materialSortState.sortBy];
+            
+            if (materialSortState.sortOrder === 'asc') {
+              return aValue - bValue;
+            } else {
+              return bValue - aValue;
+            }
+          });
+        }
+
+        displayData.forEach(material => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="px-4 py-3">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-warning/10 text-warning">
+                ${material.materialId}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-center">${material.count}</td>
+            <td class="px-4 py-3">${formatNumber(material.totalCost)}</td>
+            <td class="px-4 py-3">${formatNumber(material.totalRevenue)}</td>
+            <td class="px-4 py-3">${formatNumber(material.totalRevenue3d)}</td>
+            <td class="px-4 py-3">${formatNumber(material.totalRevenue7d)}</td>
+            <td class="px-4 py-3">${formatRoi(material.roi)}</td>
+            <td class="px-4 py-3">${formatRoi(material.roi3d)}</td>
+            <td class="px-4 py-3">${formatRoi(material.roi7d)}</td>
+          `;
+          materialDataBody.appendChild(row);
+        });
+
+        materialCountElement.textContent = `素材ID数量: ${displayData.length}`;
+      }
+
+      // 显示单元ID维度数据
+      function displayAdData(data, adCountElement) {
+        const adDataBody = document.getElementById('ad-data-body');
+        adDataBody.innerHTML = '';
+        materialStats.innerHTML = '';
+
+        const selectedAccount = accountFilter.value;
+        let filteredData = data.adData;
+
+        // 应用账户筛选
+        if (selectedAccount) {
+          filteredData = filteredData.filter(item => item.account === selectedAccount);
+        }
+
+        // 应用素材ID筛选
+        if (currentMaterialFilter) {
+          filteredData = filteredData.filter(item => item.materialId === currentMaterialFilter);
+        }
+
+        // 应用排序
+        if (adSortState.sortBy) {
+          filteredData.sort((a, b) => {
+            const aValue = a[adSortState.sortBy];
+            const bValue = b[adSortState.sortBy];
+            
+            if (adSortState.sortOrder === 'asc') {
+              return aValue - bValue;
+            } else {
+              return bValue - aValue;
+            }
+          });
+        }
+
+        // 统计素材ID（仅统计投放中单元）
+        const materialIdCounts = {};
+        const activeAds = data.adData.filter(ad => ad.status === '投放中');
+        
+        activeAds.forEach(ad => {
+          if (ad.materialId) {
+            materialIdCounts[ad.materialId] = (materialIdCounts[ad.materialId] || 0) + 1;
+          }
+        });
+
+        // 显示素材ID统计
+        if (Object.keys(materialIdCounts).length > 0) {
+          materialStatsContainer.classList.remove('hidden');
+          
+          // 按使用次数降序排序
+          const sortedMaterialIds = Object.keys(materialIdCounts).sort((a, b) => materialIdCounts[b] - materialIdCounts[a]);
+          
+          sortedMaterialIds.forEach(materialId => {
+            const count = materialIdCounts[materialId];
+            const badge = document.createElement('div');
+            badge.className = 'flex items-center bg-white border border-gray-200 rounded-lg px-3 py-1 shadow-sm transition-smooth cursor-pointer hover:border-primary hover:shadow-md';
+            badge.innerHTML = `
+              <span class="font-medium text-primary mr-2">${materialId}</span>
+              <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">${count}次</span>
+            `;
+            
+            // 添加点击事件
+            badge.addEventListener('click', () => {
+              filterByMaterialId(materialId);
+            });
+            
+            // 如果当前正在筛选此素材ID，添加高亮效果
+            if (currentMaterialFilter === materialId) {
+              badge.classList.add('border-primary', 'bg-primary/5', 'shadow-md');
+            }
+            
+            materialStats.appendChild(badge);
+          });
+          
+          materialStatsCount.textContent = `共 ${sortedMaterialIds.length} 个素材ID`;
+        } else {
+          materialStatsContainer.classList.add('hidden');
+        }
+
+        // 显示/隐藏清除筛选按钮
+        if (currentMaterialFilter) {
+          clearMaterialFilter.classList.remove('hidden');
+        } else {
+          clearMaterialFilter.classList.add('hidden');
+        }
+
+        // 填充表格数据
+        filteredData.forEach(ad => {
+          const row = document.createElement('tr');
+          
+          // 根据单元一级状态确定圆点颜色
+          let dotColor = 'bg-yellow-400'; // 默认黄色（其他状态）
+          if (ad.status === '投放中') {
+            dotColor = 'bg-green-500'; // 投放中 - 绿色
+          } else if (ad.status === '未投放') {
+            dotColor = 'bg-red-500'; // 未投放 - 红色
+          }
+          
+          row.innerHTML = `
+            <td class="px-4 py-3 flex items-center">
+              ${ad.adId}
+              <span class="ml-2 inline-block h-2 w-2 rounded-full ${dotColor}"></span>
+            </td>
+            <td class="px-4 py-3">${formatNumber(ad.cost)}</td>
+            <td class="px-4 py-3">${formatNumber(ad.revenue)}</td>
+            <td class="px-4 py-3">${formatRoi(ad.roi)}</td>
+            <td class="px-4 py-3">${formatRoi(ad.roi3d)}</td>
+            <td class="px-4 py-3">${formatRoi(ad.roi7d)}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary/10 text-primary">
+                ${ad.account}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-secondary/10 text-secondary">
+                ${ad.campaignName}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              ${ad.materialId ? `
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-warning/10 text-warning">
+                  ${ad.materialId}
+                </span>
+              ` : '<span class="text-gray-400">-</span>'}
+            </td>
+          `;
+          adDataBody.appendChild(row);
+        });
+
+        adCountElement.textContent = `单元数量: ${filteredData.length}`;
+
+        if (filteredData.length === 0) {
+          noResults.classList.remove('hidden');
+        } else {
+          noResults.classList.add('hidden');
+        }
+      }
+
+      // 根据素材ID筛选单元
+      function filterByMaterialId(materialId) {
+        currentMaterialFilter = materialId;
+        // 清空账户筛选
+        accountFilter.value = '';
+        displayAdData(processedData, adCount);
+      }
+
+      // 清除素材ID筛选
+      function clearMaterialFilterHandler() {
+        currentMaterialFilter = null;
+        displayAdData(processedData, adCount);
+      }
+
+      // 为清除筛选按钮添加点击事件
+      if (clearMaterialFilter) {
+        clearMaterialFilter.addEventListener('click', clearMaterialFilterHandler);
+      }
+
+      // 填充账户筛选下拉框
+      function populateAccountFilter(accountData) {
+        const accountFilter = document.getElementById('account-filter');
+        accountFilter.innerHTML = '<option value="">所有账户</option>';
+
+        const uniqueAccounts = [...new Set(accountData.map(item => item.account))];
+        uniqueAccounts.forEach(account => {
+          const option = document.createElement('option');
+          option.value = account;
+          option.textContent = account;
+          accountFilter.appendChild(option);
+        });
+
+        // 账户筛选下拉框选择事件
+        accountFilter.addEventListener('change', () => {
+          // 清空素材ID筛选
+          currentMaterialFilter = null;
+          displayAdData(processedData, adCount);
+        });
+      }
+
+      // 格式化数字
+      function formatNumber(num) {
+        return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      // 格式化ROI
+      function formatRoi(roi) {
+        return (roi * 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+      }
+
+      // 排序按钮点击事件处理
+      function handleSortButtonClick(tableType, sortBy) {
+        if (tableType === 'account') {
+          if (accountSortState.sortBy === sortBy) {
+            // 同一列，切换排序顺序
+            accountSortState.sortOrder = accountSortState.sortOrder === 'asc' ? 'desc' : 'asc';
+          } else {
+            // 不同列，重置为升序
+            accountSortState.sortBy = sortBy;
+            accountSortState.sortOrder = 'asc';
+          }
+          displayAccountData(processedData, document.getElementById('account-count'));
+        } else if (tableType === 'material') {
+          if (materialSortState.sortBy === sortBy) {
+            // 同一列，切换排序顺序
+            materialSortState.sortOrder = materialSortState.sortOrder === 'asc' ? 'desc' : 'asc';
+          } else {
+            // 不同列，重置为升序
+            materialSortState.sortBy = sortBy;
+            materialSortState.sortOrder = 'asc';
+          }
+          displayMaterialData(processedData, document.getElementById('material-count'));
+        } else if (tableType === 'ad') {
+          if (adSortState.sortBy === sortBy) {
+            // 同一列，切换排序顺序
+            adSortState.sortOrder = adSortState.sortOrder === 'asc' ? 'desc' : 'asc';
+          } else {
+            // 不同列，重置为升序
+            adSortState.sortBy = sortBy;
+            adSortState.sortOrder = 'asc';
+          }
+          displayAdData(processedData, document.getElementById('ad-count'));
+        }
+      }
+
+      // 为排序按钮添加事件监听器（一次性绑定）
+      document.addEventListener('click', function(e) {
+        if (e.target.closest('.sort-button')) {
+          const button = e.target.closest('.sort-button');
+          const tableType = button.dataset.table;
+          const sortBy = button.dataset.sort;
+          
+          if (tableType && sortBy) {
+            handleSortButtonClick(tableType, sortBy);
+          }
+        }
+      });
+
+      // 帮助按钮相关事件
+      helpButton.addEventListener('click', () => {
+        helpModal.classList.remove('hidden');
+      });
+
+      closeHelp.addEventListener('click', () => {
+        helpModal.classList.add('hidden');
+      });
+
+      gotIt.addEventListener('click', () => {
+        helpModal.classList.add('hidden');
+      });
+
+      // 点击模态框外部关闭
+      helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+          helpModal.classList.add('hidden');
+        }
+      });
+    }
+  </script>
+</body>
+
 </html>
